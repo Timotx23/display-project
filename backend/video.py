@@ -349,4 +349,70 @@ class VideoService:
         )
         return video_reader.iter_multicamera_episode_frames()
 
+    def get_dataset_joint_statistics(
+        self,
+        database_path: str,
+        split: str = "train",
+    ) -> dict[str, dict[str, float]]:
+        """
+        Compute dataset-level descriptive stats for joint sensors across all episodes/steps.
+        Uses online accumulation for memory efficiency.
+        """
+        import tensorflow_datasets as tfds
+
+        dataset_loader = DatasetLoader(DatasetLoadConfig(database_path=database_path, split=split))
+        dataset = dataset_loader.load()
+        reader = VideoReader(dataset=dataset, config=VideoConfig())
+
+        joint_count = 6
+        counts = np.zeros(joint_count, dtype=np.int64)
+        means = np.zeros(joint_count, dtype=np.float64)
+        m2 = np.zeros(joint_count, dtype=np.float64)
+        mins = np.full(joint_count, np.inf, dtype=np.float64)
+        maxs = np.full(joint_count, -np.inf, dtype=np.float64)
+
+        for episode in tfds.as_numpy(dataset):
+            steps = episode.get("steps")
+            if steps is None:
+                continue
+            for step in steps:
+                joint_angles = reader._extract_joint_angles(step)
+                if joint_angles is None or len(joint_angles) < joint_count:
+                    continue
+                for idx, raw_value in enumerate(joint_angles[:joint_count]):
+                    try:
+                        value = float(raw_value)
+                    except (TypeError, ValueError):
+                        continue
+                    if not np.isfinite(value):
+                        continue
+
+                    counts[idx] += 1
+                    delta = value - means[idx]
+                    means[idx] += delta / counts[idx]
+                    delta2 = value - means[idx]
+                    m2[idx] += delta * delta2
+                    mins[idx] = min(mins[idx], value)
+                    maxs[idx] = max(maxs[idx], value)
+
+        stats: dict[str, dict[str, float]] = {}
+        for idx in range(joint_count):
+            sensor_name = f"Joint {idx + 1}"
+            if counts[idx] == 0:
+                stats[sensor_name] = {
+                    "mean": float("nan"),
+                    "std": float("nan"),
+                    "min": float("nan"),
+                    "max": float("nan"),
+                }
+                continue
+            variance = m2[idx] / counts[idx]
+            stats[sensor_name] = {
+                "mean": float(means[idx]),
+                "std": float(np.sqrt(variance)),
+                "min": float(mins[idx]),
+                "max": float(maxs[idx]),
+            }
+        return stats
+
 

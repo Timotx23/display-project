@@ -59,3 +59,11 @@ def get_prompt_for_current_selection() -> str | None:
 
 def set_episode_for_current_selection(episode: int) -> None:
     set_episode(max(0, int(episode)))
+
+
+def get_dataset_joint_statistics_for_current_selection() -> dict[str, dict[str, float]]:
+    display_state = get_saved_display_state()
+    service = VideoService()
+    return service.get_dataset_joint_statistics(
+        database_path=display_state.database_path,
+    )

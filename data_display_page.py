@@ -6,6 +6,7 @@ import numpy as np
 
 from backend.data_display_logic import (
     get_display_state,
+    get_dataset_joint_statistics_for_current_selection,
     get_prompt_for_current_selection,
     iter_multicamera_frames_for_current_selection,
     reset_to_landing,
@@ -236,3 +237,21 @@ def render_data_display_page() -> None:
 
     if st.button("Back to Landing Page"):
         reset_to_landing()
+
+    st.subheader("Dataset Statistics")
+    try:
+        dataset_stats = get_dataset_joint_statistics_for_current_selection()
+        dataset_stats_rows = []
+        for sensor_name, sensor_stats in dataset_stats.items():
+            dataset_stats_rows.append(
+                {
+                    "Sensor": sensor_name,
+                    "Mean": sensor_stats["mean"],
+                    "Std": sensor_stats["std"],
+                    "Min": sensor_stats["min"],
+                    "Max": sensor_stats["max"],
+                }
+            )
+        st.dataframe(pd.DataFrame(dataset_stats_rows), use_container_width=True)
+    except Exception as error:
+        st.error(f"Failed to compute dataset statistics: {error}")
