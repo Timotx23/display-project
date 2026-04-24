@@ -1,0 +1,13 @@
+name: display-project-macos
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - streamlit==1.50.0
+      - numpy==1.24.3
+      - tensorflow-datasets==4.9.9
+      - tensorflow-macos==2.13.1
+      - urllib3<2
