@@ -61,6 +61,44 @@ def _calculate_moving_average_delta_joint_angles(recent_steps: list[list[float]]
     return np.mean(deltas, axis=0).tolist()
 
 
+def _render_descriptive_statistics(
+    container: st.delta_generator.DeltaGenerator,
+    rendered_frames: int,
+    wrist_rendered_frames: int,
+    joint_angle_history: list[list[float]],
+) -> None:
+    """Render sensor-level descriptive statistics below the videos."""
+    container.subheader("Descriptive Statistics")
+
+    wrist_missing_frames = max(0, rendered_frames - wrist_rendered_frames)
+    wrist_availability = (
+        (wrist_rendered_frames / rendered_frames) * 100.0 if rendered_frames > 0 else 0.0
+    )
+    valid_joint_samples = len(joint_angle_history)
+    invalid_joint_samples = max(0, rendered_frames - valid_joint_samples)
+
+    sensor_summary = pd.DataFrame(
+        {
+            "Sensor": ["Main Camera", "Wrist Camera", "Joint Angles"],
+            "Samples": [rendered_frames, wrist_rendered_frames, valid_joint_samples],
+            "Missing": [0, wrist_missing_frames, invalid_joint_samples],
+            "Coverage (%)": [100.0 if rendered_frames > 0 else 0.0, wrist_availability, (valid_joint_samples / rendered_frames * 100.0) if rendered_frames > 0 else 0.0],
+        }
+    )
+    container.dataframe(sensor_summary, use_container_width=True)
+
+    if joint_angle_history:
+        joint_df = pd.DataFrame(
+            joint_angle_history,
+            columns=[f"Joint {joint_idx}" for joint_idx in range(1, 7)],
+        )
+        joint_stats = joint_df.agg(["mean", "std", "min", "max"]).transpose().reset_index()
+        joint_stats.columns = ["Joint", "Mean", "Std", "Min", "Max"]
+        container.dataframe(joint_stats, use_container_width=True)
+    else:
+        container.caption("No valid joint-angle samples available yet.")
+
+
 def render_data_display_page() -> None:
     st.title("Data Display")
 
@@ -103,6 +141,7 @@ def render_data_display_page() -> None:
     right_column.subheader("Sync Monitor")
     frame_counter_placeholder = right_column.empty()
     sync_status_placeholder = right_column.empty()
+    descriptive_stats_container = st.container()
 
     if play_video_clicked:
         frame_delay_seconds = 1.0 / max(1, display_state.fps)
@@ -188,6 +227,12 @@ def render_data_display_page() -> None:
                 sync_status_placeholder.warning(
                     "Playback complete: some wrist frames were missing, but frame index stayed shared."
                 )
+            _render_descriptive_statistics(
+                container=descriptive_stats_container,
+                rendered_frames=rendered_frames,
+                wrist_rendered_frames=wrist_rendered_frames,
+                joint_angle_history=joint_angle_history,
+            )
 
     if st.button("Back to Landing Page"):
         reset_to_landing()
