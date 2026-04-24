@@ -7,7 +7,7 @@ Simple Streamlit app with:
 ## Requirements
 
 - Python 3.10+ (or compatible local Python 3)
-
+streamlit run main.py
 
 
 ## Run
